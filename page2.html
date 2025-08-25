@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard 2 - Customer Sentiment Watchdog</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gradient-to-r from-purple-800 via-pink-700 to-rose-800 min-h-screen text-white font-sans">
+  <header class="p-6 text-center">
+    <h1 class="text-3xl font-bold">Customer Sentiment Watchdog ⭐ (Dashboard 2)</h1>
+    <p class="text-sm mt-1">Advanced Analysis with Review Stars</p>
+    <div class="mt-2">
+      <a href="page1.html" class="underline text-cyan-300">👈 Back to Dashboard 1</a>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto p-6 space-y-8">
+    <!-- Input card -->
+    <div class="bg-black/30 rounded-lg p-6 shadow-lg">
+      <h2 class="text-xl font-semibold mb-4">Type a Message</h2>
+      <div class="flex flex-col md:flex-row gap-4">
+        <input id="msgInput" type="text" placeholder="Write something... e.g. I am happy" class="flex-grow p-3 rounded-md text-gray-900">
+        <button id="analyzeBtn" class="bg-pink-600 hover:bg-pink-700 px-6 py-3 rounded-md">Analyze</button>
+      </div>
+      <div id="toneResult" class="mt-4 text-lg"></div>
+      <div id="starsResult" class="mt-2 text-2xl"></div>
+    </div>
+
+    <!-- Graphs -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-black/30 rounded-lg p-6">
+        <h3 class="text-lg font-semibold mb-2">Column Chart</h3>
+        <canvas id="barChart"></canvas>
+      </div>
+      <div class="bg-black/30 rounded-lg p-6">
+        <h3 class="text-lg font-semibold mb-2">Line Chart</h3>
+        <canvas id="lineChart"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <footer class="text-center text-sm mt-8 text-gray-300">
+    <b>Team NueroNet</b> 🚀 Hackathon Project
+  </footer>
+
+<script>
+const ctxBar = document.getElementById('barChart').getContext('2d');
+const ctxLine = document.getElementById('lineChart').getContext('2d');
+
+let counts = {happy:0, moderate:0, sad:0, angry:0};
+let history = [];
+
+// Charts
+const barChart = new Chart(ctxBar, {
+  type: 'bar',
+  data: {
+    labels: ['Happy','Moderate','Sad','Angry'],
+    datasets: [{
+      label: 'Messages',
+      data: [0,0,0,0],
+      backgroundColor: ['#22c55e','#eab308','#3b82f6','#ef4444']
+    }]
+  },
+  options: {scales:{y:{beginAtZero:true}}}
+});
+
+const lineChart = new Chart(ctxLine, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Messages Over Time',
+      data: [],
+      borderColor: '#06b6d4',
+      backgroundColor: 'rgba(6,182,212,0.3)',
+      fill:true,
+      tension:0.2
+    }]
+  },
+  options:{scales:{y:{beginAtZero:true}}}
+});
+
+
+function analyzeTone(msg){
+  msg = msg.toLowerCase();
+  // Happy/Positive
+  if(/happy|love|great|awesome|amazing|proud|excited|delighted|fantastic|superb|best|wonderful/.test(msg)){
+    return {tone:'Happy',emoji:'😊',stars:5,key:'happy'};
+  }
+  // Moderate/Neutral
+  else if(/confused|ok|fine|moderate|normal|average|not bad|decent/.test(msg)){
+    return {tone:'Moderate',emoji:'🙂',stars:3,key:'moderate'};
+  }
+  // Sad/Disappointed
+  else if(/sad|disappointed|upset|bad|unhappy|unlucky|poor|let down|low/.test(msg)){
+    return {tone:'Sad',emoji:'😞',stars:1,key:'sad'};
+  }
+  // Angry/Abusive
+  else if(/angry|hate|worst|terrible|abuse|fuck|shit|mad|ghatiya|bakwas|useless|rude|idiot/.test(msg)){
+    return {tone:'Angry',emoji:'😡',stars:0,key:'angry'};
+  }
+  // Default fallback
+  else {
+    return {tone:'Moderate',emoji:'🙂',stars:3,key:'moderate'};
+  }
+}
+
+
+document.getElementById('analyzeBtn').addEventListener('click',()=>{
+  const msg = document.getElementById('msgInput').value.trim();
+  if(!msg){alert('Type a message');return;}
+  const result = analyzeTone(msg);
+  document.getElementById('toneResult').innerHTML = 
+    `Tone: <b class='text-yellow-300'>${result.tone} ${result.emoji}</b>`;
+  document.getElementById('starsResult').textContent = '⭐'.repeat(result.stars);
+
+  // Update counts
+  counts[result.key]++;
+  barChart.data.datasets[0].data = [counts.happy,counts.moderate,counts.sad,counts.angry];
+  barChart.update();
+
+  // Update line chart
+  history.push(result.tone);
+  lineChart.data.labels.push(history.length.toString());
+  lineChart.data.datasets[0].data.push(history.length);
+  lineChart.update();
+});
+</script>
+</body>
+</html>

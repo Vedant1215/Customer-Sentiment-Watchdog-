@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Sentiment Watchdog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @keyframes gradientBG {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            background: linear-gradient(-45deg, #800000, #c026d3, #FF00FF, #800000);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+        .card-gradient {
+            background: linear-gradient(to right, #4169E1, #800000);
+        }
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8 text-white">
+            <h1 class="text-3xl md:text-4xl font-bold" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.2);">Customer Sentiment Watchdog</h1>
+            <p class="mt-1" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.2);">Real-time sentiment analysis for your support teams</p>
+        </header><div style="text-align:center;margin:10px"><a href="page2.html" style="font-size:18px;color:black;background:white;padding:6px 12px;border-radius:6px;text-decoration:none">👉 Go to Dashboard 2</a></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-8">
+                <div class="card-gradient text-white p-6 rounded-lg card-shadow">
+                    <h2 class="text-xl font-semibold mb-4">Analyze Text Sentiment</h2>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input type="text" id="text-input" class="flex-grow p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-800" placeholder="Enter a sentence to analyze...">
+                        <button id="analyze-btn" class="bg-rose-800 text-white px-6 py-3 rounded-md hover:bg-rose-900 transition duration-300">Analyze</button>
+                    </div>
+                    <div id="manual-result" class="mt-4 text-lg"></div>
+                </div>
+
+                <div class="card-gradient text-white p-6 rounded-lg card-shadow">
+                    <h2 class="text-xl font-semibold mb-4">Real-Time Platform Feeds</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6" id="real-time-feeds">
+                        </div>
+                </div>
+            </div>
+
+            <div class="space-y-8">
+                <div class="card-gradient text-white p-6 rounded-lg card-shadow">
+                    <h2 class="text-xl font-semibold mb-4">Overall Sentiment Trend</h2>
+                    <canvas id="sentiment-chart"></canvas>
+                </div>
+                <div class="card-gradient text-white p-6 rounded-lg card-shadow">
+                    <h2 class="text-xl font-semibold mb-4">Alerts</h2>
+                    <div id="alerts-container" class="space-y-3">
+                        <p class="text-slate-300">No new alerts.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set default chart color for labels and axes
+            Chart.defaults.color = '#fff';
+
+            // Mock data and sentiment analysis
+            const mockComments = {
+                Twitter: [
+                    "Just got the new XYZ phone, and the camera is amazing! #tech",
+                    "Ugh, my flight with @Airline a total disaster. Never again.",
+                    "This new coffee shop has the best latte I've ever tasted.",
+                    "Why is customer service so slow to respond? Frustrating!",
+                    "This is the worst product I have ever bought. So bad."
+                ],
+                Amazon: [
+                    "The product arrived damaged. Very disappointed with the packaging.",
+                    "Five stars! This vacuum cleaner is a game-changer for my home.",
+                    "It's an okay product, does the job but nothing special.",
+                    "I'm delighted with this purchase. It exceeded my expectations.",
+                    "I hate this. It broke after one use. Terrible quality."
+                ],
+                Instagram: [
+                    "Loving the new collection! 😍",
+                    "The quality of this is not what I expected. 😠",
+                    "Can't get enough of this! So good!",
+                    "My order is late and I'm getting really annoyed.",
+                    "Awful service, will not be buying again."
+                ],
+                'Google Playstore': [
+                    "This app is fantastic! So easy to use and very helpful.",
+                    "Crashes all the time after the new update. Please fix it!",
+                    "I'm confused about how to use the new features.",
+                    "Great app, but it drains my battery so quickly.",
+                    "Horrible update, it's unusable now."
+                ],
+                Google: [
+                    "The search results are less relevant lately. Very frustrating.",
+                    "I love Google Maps, it's a lifesaver!",
+                    "Why so many ads at the top of the search page now? Bad change.",
+                    "Google Photos is the best for storing memories."
+                ],
+                Reddit: [
+                    "This subreddit is so wholesome, I love it here.",
+                    "The moderation on r/some-sub is terrible. Power-tripping mods.",
+                    "Found an amazing tip on Reddit that solved my problem!",
+                    "Just another argument in the comments. So much negativity."
+                ]
+            };
+
+            const platforms = ['Twitter', 'Amazon', 'Instagram', 'Google Playstore', 'Google', 'Reddit'];
+            const feedsContainer = document.getElementById('real-time-feeds');
+
+            // --- START: MODIFIED SENTIMENT LOGIC ---
+            function getSentiment(text) {
+                const lowerText = text.toLowerCase();
+                
+                const emotions = {
+                    anger: { words: ['hate', 'terrible', 'horrible', 'awful', 'worst', 'disaster', 'power-tripping'], emotion: 'Anger', color: 'text-red-500', emoji: '😡' },
+                    frustration: { words: ['frustrating', 'annoyed', '😠', 'crashes', 'slow', 'late', 'unusable', 'drains my battery', 'negativity'], emotion: 'Frustration', color: 'text-rose-400', emoji: '😤' },
+                    disappointment: { words: ['disappointed', 'damaged', 'not what I expected', 'bad change', 'let down', 'bad'], emotion: 'Disappointment', color: 'text-orange-400', emoji: '😞' },
+                    excitement: { words: ['amazing', 'fantastic', 'loving', '😍', 'game-changer', 'lifesaver'], emotion: 'Excitement', color: 'text-lime-300', emoji: '🤩' },
+                    satisfaction: { words: ['best', 'delighted', 'great', 'five stars', 'wholesome', 'solved my problem', 'love', 'easy to use', 'helpful', 'exceeded'], emotion: 'Satisfaction', color: 'text-cyan-300', emoji: '😊' },
+                    confusion: { words: ['confused', 'how to', 'what is', 'less relevant'], emotion: 'Confusion', color: 'text-yellow-300', emoji: '😕' }
+                };
+
+                for (const key in emotions) {
+                    if (emotions[key].words.some(word => lowerText.includes(word))) {
+                        return emotions[key];
+                    }
+                }
+                
+                return { emotion: 'Neutral', color: 'text-slate-300', emoji: '😐' };
+            }
+            // --- END: MODIFIED SENTIMENT LOGIC ---
+
+
+            // Manual analysis
+            const analyzeBtn = document.getElementById('analyze-btn');
+            const textInput = document.getElementById('text-input');
+            const manualResult = document.getElementById('manual-result');
+
+            analyzeBtn.addEventListener('click', () => {
+                const text = textInput.value;
+                if (text) {
+                    const sentiment = getSentiment(text);
+                    manualResult.innerHTML = `Sentiment: <span class="${sentiment.color} font-semibold">${sentiment.emotion} ${sentiment.emoji}</span>`;
+                }
+            });
+
+            // Populate real-time feeds
+            platforms.forEach(platform => {
+                const platformId = platform.toLowerCase().replace(/\s+/g, '');
+                const feedEl = document.createElement('div');
+                feedEl.className = 'border border-white/20 p-4 rounded-lg';
+                feedEl.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-semibold">${platform}</h3>
+                        <span id="ratio-${platformId}" class="text-xs font-mono p-1 bg-white/10 rounded"></span>
+                    </div>
+                    <div id="feed-${platformId}"></div>
+                `;
+                feedsContainer.appendChild(feedEl);
+            });
+
+            function calculateAndDisplayRatios() {
+                const positiveEmotions = ['Excitement', 'Satisfaction'];
+                const negativeEmotions = ['Anger', 'Frustration', 'Disappointment'];
+
+                platforms.forEach(platform => {
+                    const platformId = platform.toLowerCase().replace(/\s+/g, '');
+                    const comments = mockComments[platform];
+                    let positiveCount = 0;
+                    let negativeCount = 0;
+
+                    comments.forEach(comment => {
+                        const sentiment = getSentiment(comment);
+                        if (positiveEmotions.includes(sentiment.emotion)) {
+                            positiveCount++;
+                        } else if (negativeEmotions.includes(sentiment.emotion)) {
+                            negativeCount++;
+                        }
+                    });
+
+                    const ratioEl = document.getElementById(`ratio-${platformId}`);
+                    if (ratioEl) {
+                        ratioEl.innerHTML = `
+                            <span class="font-bold text-cyan-300">${positiveCount}</span> : <span class="font-bold text-rose-400">${negativeCount}</span>
+                        `;
+                    }
+                });
+            }
+
+            function updateFeeds() {
+                const negativeEmotionsForAlerts = ['Anger', 'Frustration', 'Disappointment'];
+                platforms.forEach(platform => {
+                    const platformId = platform.toLowerCase().replace(/\s+/g, '');
+                    const container = document.getElementById(`feed-${platformId}`);
+                    const comment = mockComments[platform][Math.floor(Math.random() * mockComments[platform].length)];
+                    const sentiment = getSentiment(comment);
+
+                    const newCommentEl = document.createElement('div');
+                    newCommentEl.className = 'p-2 border-b border-white/20 animate-fade-in';
+                    newCommentEl.innerHTML = `
+                        <p class="text-sm">"${comment}"</p>
+                        <p class="text-xs ${sentiment.color} font-medium">${sentiment.emotion} ${sentiment.emoji}</p>
+                    `;
+                    
+                    if (container.children.length >= 3) {
+                        container.removeChild(container.lastChild);
+                    }
+                    container.prepend(newCommentEl);
+                    
+                    if(negativeEmotionsForAlerts.includes(sentiment.emotion)) {
+                        triggerAlert(platform, comment, sentiment);
+                    }
+                });
+                updateChart();
+            }
+            
+            // Alerts
+            const alertsContainer = document.getElementById('alerts-container');
+            function triggerAlert(platform, comment, sentiment) {
+                if (alertsContainer.innerHTML.includes("No new alerts")) {
+                    alertsContainer.innerHTML = '';
+                }
+                const alertEl = document.createElement('div');
+                alertEl.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-r-lg animate-fade-in';
+                alertEl.innerHTML = `<p class="font-bold">Negative Sentiment Spike: ${sentiment.emotion}!</p><p class="text-sm">${platform}: "${comment}"</p>`;
+                alertsContainer.prepend(alertEl);
+
+                if (alertsContainer.children.length > 3) {
+                    alertsContainer.removeChild(alertsContainer.lastChild);
+                }
+            }
+
+            // Chart.js for sentiment trend
+            const ctx = document.getElementById('sentiment-chart').getContext('2d');
+            const sentimentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['-5m', '-4m', '-3m', '-2m', '-1m', 'Now'],
+                    datasets: [{
+                        label: 'Positive',
+                        data: [65, 59, 80, 81, 56, 55],
+                        borderColor: 'rgb(34, 197, 94)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                        tension: 0.1,
+                        fill: true
+                    }, {
+                        label: 'Negative',
+                        data: [28, 48, 40, 19, 36, 27],
+                        borderColor: 'rgb(239, 68, 68)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.2)'
+                            }
+                        },
+                        x: {
+                           grid: {
+                                color: 'rgba(255, 255, 255, 0.2)'
+                            } 
+                        }
+                    }
+                }
+            });
+
+            function updateChart() {
+                sentimentChart.data.datasets.forEach(dataset => {
+                    dataset.data.shift();
+                    dataset.data.push(Math.floor(Math.random() * 100));
+                });
+                sentimentChart.update();
+            }
+            
+            // Initial load and interval
+            calculateAndDisplayRatios();
+            updateFeeds();
+            setInterval(updateFeeds, 5000);
+
+            // CSS for fade-in animation
+            const style = document.createElement('style');
+            style.innerHTML = `
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-fade-in {
+                    animation: fadeIn 0.5s ease-out;
+                }
+            `;
+            document.head.appendChild(style);
+        });
+    </script>
+<footer style="margin:20px;text-align:center;color:white"><b>Team NueroNet</b> 🚀 Hackathon Project</footer>
+</body>
+</html>
